@@ -1,5 +1,6 @@
 #include <extapp_api.h>
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -33,6 +34,8 @@
 #endif
 
 static bool running = false;
+// Default palette
+uint16_t palette[4] = { 0x9DE1, 0x8D61, 0x3306, 0x09C1 };
 
 struct priv_t {
   // Pointer to allocated memory holding GB file.
@@ -84,7 +87,6 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH], const uint_fast8_t line) {
   struct priv_t *priv = gb->direct.priv;
-  const uint16_t palette[] = { 0x9DE1, 0x8D61, 0x3306, 0x09C1 };
 
   for(unsigned int x = 0; x < LCD_WIDTH; x++) {
     priv->line_buffer[x] = palette[pixels[x] & 3];
@@ -92,6 +94,55 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH], const uint_
   
   extapp_pushRect((NW_LCD_WIDTH - LCD_WIDTH) / 2, (NW_LCD_HEIGHT - LCD_HEIGHT) / 2 + line, LCD_WIDTH, 1, priv->line_buffer);
 }
+
+// Sets the custom palette for the game if there is one
+int choose_palette(const char* name) {
+  if (strstr(name, "Pokemon") != NULL)
+  {
+    // https://lospec.com/palette-list/pokemon-sgb
+    palette[0] = 0xFF7F;
+    palette[1] = 0xF5B1;
+    palette[2] = 0x83B3;
+    palette[3] = 0x1882;
+  } 
+
+  else if (strstr(name, "Link's Awakening") != NULL) 
+  {
+    // https://lospec.com/palette-list/links-awakening-sgb
+    palette[0] = 0xFFF6;
+    palette[1] = 0x7E2F;
+    palette[2] = 0x6C68;
+    palette[3] = 0x59C4;
+  }
+
+  else if (strstr(name, "Wario Land") != NULL) {
+    // https://lospec.com/palette-list/gb-chocolate
+    palette[0] = 0xff18;
+    palette[1] = 0xab09;
+    palette[2] = 0xdd2a;
+    palette[3] = 0x4146;
+  }
+  
+  else if (strstr(name, "Tetris.GB") != NULL) {
+    // https://lospec.com/palette-list/dune-gb
+    palette[0] = 0xee54;
+    palette[1] = 0xdd6e;
+    palette[2] = 0xe3a3;
+    palette[3] = 0x3020;
+  }
+
+  /*
+  else if (strstr(name, "") != 0) {
+    //
+    palette[0] = 0x;
+    palette[1] = 0x;
+    palette[2] = 0x;
+    palette[3] = 0x;
+  }
+  */
+  return &lcd_draw_line;
+}
+
 
 enum save_status_e {
   SAVE_READ_OK,
@@ -203,7 +254,7 @@ void extapp_main() {
   saveCooldown = SAVE_COOLDOWN;
   
   // Init LCD
-  gb_init_lcd(&gb, &lcd_draw_line);
+  gb_init_lcd(&gb, choose_palette(file_name));
   
   extapp_pushRectUniform(0, 0, NW_LCD_WIDTH, NW_LCD_HEIGHT, 0);
   
@@ -255,6 +306,7 @@ void extapp_main() {
     
     if (saveCooldown > 1) {
       saveCooldown--;
+      extapp_drawTextSmall(file_name, 20, NW_LCD_HEIGHT - 50, 65535, 0, false);
       switch(saveMessage) {
         case SAVE_READ_OK:
           extapp_drawTextSmall("Loaded save!", 10, NW_LCD_HEIGHT - 30, 65535, 0, false);
